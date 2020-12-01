@@ -136,9 +136,14 @@ class DerivO3CPU(BaseCPU):
 
     numRobs = Param.Unsigned(1, "Number of Reorder Buffers");
 
-    numPhysIntRegs = Param.Unsigned(256, "Number of physical integer registers")
-    numPhysFloatRegs = Param.Unsigned(256, "Number of physical floating point "
-                                      "registers")
+    # numPhysIntRegs = Param.Unsigned(256,"Number of physical integer "
+                                    #   "registers")
+    # numPhysFloatRegs = Param.Unsigned(256,"Number of physical floating "
+                                    #   "point registers")
+    numPhysIntRegs = Param.Unsigned(128, "Number of physical integer "
+                                        "registers")
+    numPhysFloatRegs = Param.Unsigned(128, "Number of physical floating "
+                                      "point registers")
     # most ISAs don't use condition-code regs, so default is 0
     _defaultNumPhysCCRegs = 0
     if buildEnv['TARGET_ISA'] in ('arm','x86'):
@@ -156,7 +161,8 @@ class DerivO3CPU(BaseCPU):
     numPhysCCRegs = Param.Unsigned(_defaultNumPhysCCRegs,
                                    "Number of physical cc registers")
     numIQEntries = Param.Unsigned(64, "Number of instruction queue entries")
-    numROBEntries = Param.Unsigned(192, "Number of reorder buffer entries")
+    # numROBEntries = Param.Unsigned(192, "Number of reorder buffer entries")
+    numROBEntries = Param.Unsigned(128, "Number of reorder buffer entries")
 
     smtNumFetchingThreads = Param.Unsigned(1, "SMT Number of Fetching Threads")
     smtFetchPolicy = Param.FetchPolicy('SingleThread', "SMT Fetch policy")
