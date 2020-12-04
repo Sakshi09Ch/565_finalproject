@@ -1023,6 +1023,8 @@ class BaseCache : public ClockedObject
          * reference. */
         Stats::Scalar unusedPrefetches;
 
+        Stats::Scalar usedPrefetches;
+
         /** Number of blocks written back per thread. */
         Stats::Vector writebacks;
 
@@ -1207,6 +1209,7 @@ class BaseCache : public ClockedObject
     bool hasBeenPrefetched(Addr addr, bool is_secure) const {
         CacheBlk *block = tags->findBlock(addr, is_secure);
         if (block) {
+            std::cout << "Found a valid prefetch block" <<std::endl;
             return block->wasPrefetched();
         } else {
             return false;
@@ -1282,6 +1285,26 @@ class BaseCache : public ClockedObject
      */
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
+
+    int used_prefetches = 0;
+
+    /* Function to return the useful prefetches at any point of time */
+    int get_used_pref(){
+        return used_prefetches;
+    }
+
+    int late_prefetches = 0;
+
+    /* Function to return the useful prefetches at any point of time */
+    int get_late_pref(){
+        return late_prefetches;
+    }
+
+    int evictedBlocks;
+    /* Function to return the useful prefetches at any point of time */
+    int get_evicted_blocks(){
+        return evictedBlocks;
+    }
 };
 
 /**

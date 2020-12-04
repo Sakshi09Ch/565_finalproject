@@ -44,8 +44,6 @@
  * Stride Prefetcher template instantiations.
  */
 
-#include "mem/cache/prefetch/stride.hh"
-
 #include <cassert>
 
 #include "base/intmath.hh"
@@ -54,6 +52,7 @@
 #include "base/trace.hh"
 #include "debug/HWPrefetch.hh"
 #include "mem/cache/prefetch/associative_set_impl.hh"
+#include "mem/cache/prefetch/stride.hh"
 #include "mem/cache/replacement_policies/base.hh"
 #include "params/StridePrefetcher.hh"
 
@@ -78,21 +77,9 @@ Stride::Stride(const StridePrefetcherParams *p)
     initConfidence(p->confidence_counter_bits, p->initial_confidence),
     threshConf(p->confidence_threshold/100.0),
     useMasterId(p->use_master_id),
-    // startDegree(p->start_degree),
     degree(p->degree),
-    epochCycles(p->epoch_cycles),
-    A_high(p->A_high),
-    A_low(p->A_low),
-    T_lateness(p->T_lateness),
-    fdp(p->useFDP),
     pcTableInfo(p->table_assoc, p->table_entries, p->table_indexing_policy,
-        p->table_replacement_policy),
-    last_interval(0),
-    // degree(startDegree)
-    current_degree(degree),
-    int_usefulPrefetches(0), int_issuedPrefetches(0), int_latePrefetches(0),
-    old_usefulPrefetches(0), old_issuedPrefetches(0), old_latePrefetches(0),
-    cur_usefulPrefetches(0), cur_issuedPrefetches(0), cur_latePrefetches(0)
+        p->table_replacement_policy)
 {
 }
 
@@ -174,71 +161,8 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
             return;
         }
 
-        if (fdp){
-            if ((curCycle() - last_interval)>epochCycles){
-                cur_usefulPrefetches =  0.5*old_usefulPrefetches +
-                                    0.5*(usedPrefetches-int_usefulPrefetches);
-                cur_issuedPrefetches =  0.5*old_issuedPrefetches +
-                                0.5*(issuedPrefetches-int_issuedPrefetches);
-                cur_latePrefetches = 0.5*old_latePrefetches +
-                                    0.5*(latePrefetches-int_latePrefetches);
-                double prefetch_accuracy =
-                    cur_usefulPrefetches / cur_issuedPrefetches;
-                double prefetch_lateness =
-                    cur_latePrefetches / cur_usefulPrefetches;
-                // double prefetch_accuracy =
-                //     usedPrefetches / issuedPrefetches;
-                // ignore indentation just to make commit possible
-    if (prefetch_accuracy>1){
-    std::cout << "----------Found Accuracy > 1----------" << std::endl;
-    std::cout << "prefetch_accuracy" << prefetch_accuracy << std::endl;
-    std::cout << "prefetch_lateness" << prefetch_lateness << std::endl;
-    std::cout << "Current Cycle" << curCycle() << std::endl;
-    std::cout << "epochCycles" << epochCycles << std::endl;
-    std::cout << "last_interval" << last_interval << std::endl;
-    std::cout << "usedPrefetches" << usedPrefetches << std::endl;
-    std::cout << "issuedPrefetches" << issuedPrefetches << std::endl;
-    std::cout << "old_usefulPrefetches" << old_usefulPrefetches << std::endl;
-    std::cout << "old_issuedPrefetches" << old_issuedPrefetches << std::endl;
-    std::cout << "old_latePrefetches" << old_latePrefetches << std::endl;
-    std::cout << "cur_usefulPrefetches" << cur_usefulPrefetches << std::endl;
-    std::cout << "cur_issuedPrefetches" << cur_issuedPrefetches << std::endl;
-    std::cout << "cur_issuedPrefetches" << cur_latePrefetches << std::endl;
-    std::cout << "int_usefulPrefetches" << int_usefulPrefetches << std::endl;
-    std::cout << "int_issuedPrefetches" << int_issuedPrefetches << std::endl;
-    std::cout << "int_issuedPrefetches" << int_latePrefetches << std::endl;
-    std::cout << "Current Degree" << current_degree << std::endl;
-    }
-
-            if (prefetch_lateness>A_low && prefetch_lateness>T_lateness
-            && current_degree<64){
-                current_degree = current_degree*2;
-            }
-            else if (prefetch_accuracy<A_low && prefetch_lateness>T_lateness
-            && current_degree>4){
-                current_degree = current_degree/2;
-            }
-
-                last_interval = curCycle();
-                //Initializtion for the beginning of next interval
-                int_usefulPrefetches = usedPrefetches;
-                int_issuedPrefetches = issuedPrefetches;
-                int_latePrefetches = latePrefetches;
-                // Update old counters
-                old_usefulPrefetches = cur_usefulPrefetches;
-                old_issuedPrefetches = cur_issuedPrefetches;
-                old_latePrefetches = cur_latePrefetches;
-                // For Dumping it to stats.txt
-                pfAccuracy = prefetch_accuracy;
-                testUsefulPrefetches = usedPrefetches;
-                testIssuedPrefetches = issuedPrefetches;
-                testLatePrefetches = latePrefetches;
-                CurrentDegree = current_degree;
-            }
-        }
-
-        // Generate up to current_degree prefetches
-        for (int d = 1; d <= current_degree; d++) {
+        // Generate up to degree prefetches
+        for (int d = 1; d <= degree; d++) {
             // Round strides up to atleast 1 cacheline
             int prefetch_stride = new_stride;
             if (abs(new_stride) < blkSize) {
@@ -259,38 +183,6 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
         entry->lastAddr = pf_addr;
         pcTable->insertEntry(pc, is_secure, entry);
     }
-}
-
-void
-Stride::regStats()
-{
-    ClockedObject::regStats();
-
-    pfAccuracy
-        .name(name() + ".pf_accuracy")
-        .desc("accuracy of the prefetcher")
-        ;
-
-    testUsefulPrefetches
-        .name(name() + ".test_useful_prefetches")
-        .desc("just to check the value of useful prefetches")
-        ;
-
-    testIssuedPrefetches
-        .name(name() + ".test_issued_prefetches")
-        .desc("just to check the value of issued prefetches")
-        ;
-
-    testLatePrefetches
-        .name(name() + ".test_late_prefetches")
-        .desc("just to check the value of late prefetches")
-        ;
-
-    CurrentDegree
-        .name(name() + ".current_degree")
-        .desc("just to check if it changes the degree")
-        ;
-
 }
 
 inline uint32_t
@@ -320,4 +212,3 @@ StridePrefetcherParams::create()
 {
     return new Prefetcher::Stride(this);
 }
-

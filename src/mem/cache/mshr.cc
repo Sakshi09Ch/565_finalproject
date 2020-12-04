@@ -107,6 +107,19 @@ MSHR::TargetList::populateFlags()
     }
 }
 
+int
+MSHR::TargetList::ifPrefetchTarget()
+{
+    int count = 0;
+    for (auto& t: *this) {
+        if (t.source == Target::FromPrefetcher){
+            count++;
+        }
+    }
+    // std::cout << "count for debugging" << count << std::endl;
+    return count;
+}
+
 void
 MSHR::TargetList::updateWriteFlags(PacketPtr pkt)
 {
@@ -750,4 +763,10 @@ MSHR::conflictAddr(const QueueEntry* entry) const
 {
     assert(hasTargets());
     return entry->matchBlockAddr(blkAddr, isSecure);
+}
+
+int
+MSHR::numPrefetchTargets()
+{
+    return targets.ifPrefetchTarget();
 }

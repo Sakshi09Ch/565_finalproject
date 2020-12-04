@@ -368,10 +368,18 @@ BaseCache::recvTimingReq(PacketPtr pkt)
 
         if (prefetcher && blk && blk->wasPrefetched()) {
             blk->status &= ~BlkHWPrefetched;
+            stats.usedPrefetches++;
+            used_prefetches++;
+            // std::cout << "Used Prefetches" << used_prefetches << std::endl;
         }
 
         handleTimingReqHit(pkt, blk, request_time);
     } else {
+        MSHR *mshr=mshrQueue.findMatch(pkt->getAddr(),pkt->isSecure(),false);
+        if (prefetcher && mshr && mshr->numPrefetchTargets()){
+            late_prefetches++;
+            // std::cout << "Late Prefetches" << late_prefetches << std::endl;
+        }
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
 
         ppMiss->notify(pkt);
@@ -1479,6 +1487,7 @@ BaseCache::evictBlock(CacheBlk *blk, PacketList &writebacks)
     if (pkt) {
         writebacks.push_back(pkt);
     }
+    evictedBlocks++;
 }
 
 PacketPtr
@@ -2018,6 +2027,8 @@ BaseCache::CacheStats::CacheStats(BaseCache &c)
                 "average number of cycles each access was blocked"),
     unusedPrefetches(this, "unused_prefetches",
                      "number of HardPF blocks evicted w/o reference"),
+    usedPrefetches(this, "used_prefetches",
+                     "number of HardPF blocks used"),
     writebacks(this, "writebacks", "number of writebacks"),
     demandMshrHits(this, "demand_mshr_hits",
                    "number of demand (read+write) MSHR hits"),

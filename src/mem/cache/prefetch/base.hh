@@ -306,6 +306,8 @@ class Base : public ClockedObject
 
     bool hasBeenPrefetched(Addr addr, bool is_secure) const;
 
+    // int getUsedPrefetches();
+
     /** Determine if addresses are on the same page */
     bool samePage(Addr a, Addr b) const;
     /** Determine the address of the block in which a lays */
@@ -324,7 +326,13 @@ class Base : public ClockedObject
     /** Total prefetches issued */
     uint64_t issuedPrefetches;
     /** Total prefetches that has been useful */
-    uint64_t usefulPrefetches;
+    uint64_t usefulPrefetches; //This is useless (always 0)
+    /** Total prefetches that has been useful (My Counter) */
+    uint64_t usedPrefetches;
+    /** Prefetches that are late (My Counter) */
+    uint64_t latePrefetches;
+    /** Number of blocks evicted from L2 Cache*/
+    uint64_t evictedBlocks;
 
     /** Registered tlb for address translations */
     BaseTLB * tlb;

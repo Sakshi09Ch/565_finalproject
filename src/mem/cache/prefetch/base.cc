@@ -95,7 +95,7 @@ Base::Base(const BasePrefetcherParams *p)
       masterId(p->sys->getMasterId(this)), pageBytes(p->sys->getPageBytes()),
       prefetchOnAccess(p->prefetch_on_access),
       useVirtualAddresses(p->use_virtual_addresses), issuedPrefetches(0),
-      usefulPrefetches(0), tlb(nullptr)
+      usefulPrefetches(0), usedPrefetches(0), latePrefetches(0), tlb(nullptr)
 {
 }
 
@@ -213,6 +213,10 @@ Base::probeNotify(const PacketPtr &pkt, bool miss)
     if (hasBeenPrefetched(pkt->getAddr(), pkt->isSecure())) {
         usefulPrefetches += 1;
     }
+
+    usedPrefetches = cache->get_used_pref();
+    latePrefetches = cache->get_late_pref();
+    evictedBlocks = cache->get_evicted_blocks();
 
     // Verify this access type is observed by prefetcher
     if (observeAccess(pkt, miss)) {

@@ -96,13 +96,7 @@ class Stride : public Queued
 
     const bool useMasterId;
 
-    // const int startDegree;
     const int degree;
-    const Cycles epochCycles;
-    const double A_high;
-    const double A_low;
-    const double T_lateness;
-    const bool fdp;
 
     /**
      * Information used to create a new PC table. All of them behave equally.
@@ -156,35 +150,11 @@ class Stride : public Queued
      */
     PCTable* allocateNewContext(int context);
 
-    Stats::Scalar pfAccuracy;
-    Stats::Scalar testUsefulPrefetches;
-    Stats::Scalar testIssuedPrefetches;
-    Stats::Scalar testLatePrefetches;
-    Stats::Scalar CurrentDegree;
-
   public:
-    Cycles last_interval;
-    // int degree;
-    int current_degree;
-    double int_usefulPrefetches;
-    double int_issuedPrefetches;
-    double int_latePrefetches;
-    double old_usefulPrefetches;
-    double old_issuedPrefetches;
-    double old_latePrefetches;
-    double cur_usefulPrefetches;
-    double cur_issuedPrefetches;
-    double cur_latePrefetches;
-
     Stride(const StridePrefetcherParams *p);
 
     void calculatePrefetch(const PrefetchInfo &pfi,
                            std::vector<AddrPriority> &addresses) override;
-
-    /**
-     * Register local statistics.
-     */
-    void regStats() override;
 };
 
 } // namespace Prefetcher

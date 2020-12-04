@@ -217,6 +217,12 @@ class MSHR : public QueueEntry, public Printable
          */
         void populateFlags();
 
+         /**
+         * Goes through the list of targets and checks if it has
+         * a target from prefetch. Returns the count for that.
+         */
+        int ifPrefetchTarget();
+
         /**
          * Add the specified packet in the TargetList. This function
          * stores information related to the added packet and updates
@@ -510,6 +516,7 @@ class MSHR : public QueueEntry, public Printable
     bool matchBlockAddr(const Addr addr, const bool is_secure) const override;
     bool matchBlockAddr(const PacketPtr pkt) const override;
     bool conflictAddr(const QueueEntry* entry) const override;
+    int numPrefetchTargets();
 };
 
 #endif // __MEM_CACHE_MSHR_HH__

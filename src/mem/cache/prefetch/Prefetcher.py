@@ -43,6 +43,10 @@ from m5.proxy import *
 from m5.objects.ClockedObject import ClockedObject
 from m5.objects.IndexingPolicies import *
 from m5.objects.ReplacementPolicies import *
+# from optparse import OptionParser
+
+# parser = OptionParser()
+# (options, args) = parser.parse_args()
 
 class HWPProbeEvent(object):
     def __init__(self, prefetcher, obj, *listOfNames):
@@ -66,6 +70,10 @@ class BasePrefetcher(ClockedObject):
         PyBindMethod("addTLB"),
     ]
     sys = Param.System(Parent.any, "System this prefetcher belongs to")
+
+    # def __init__(self, options=None):
+    #     super(BasePrefetcher, self).__init__()
+    #     pass
 
     # Get the block size from the parent (system)
     block_size = Param.Int(Parent.cache_line_size, "Block size in bytes")
@@ -117,6 +125,11 @@ class QueuedPrefetcher(BasePrefetcher):
     abstract = True
     cxx_class = "Prefetcher::Queued"
     cxx_header = "mem/cache/prefetch/queued.hh"
+
+    # def __init__(self, options=None):
+    #     super(QueuedPrefetcher, self).__init__()
+    #     pass
+
     latency = Param.Int(1, "Latency for generated prefetches")
     queue_size = Param.Int(32, "Maximum number of queued prefetches")
     max_prefetch_requests_with_pending_translation = Param.Int(32,
@@ -149,6 +162,15 @@ class StridePrefetcher(QueuedPrefetcher):
     cxx_class = 'Prefetcher::Stride'
     cxx_header = "mem/cache/prefetch/stride.hh"
 
+    # def __init__(self, options=None):
+    #     super(StridePrefetcher, self).__init__(options)
+    #     # if not options or not options.l2-hwp-type:
+    #     #     return
+    #     self.degree = Param.Int(options.l2-hwp-degree,
+    # "Number of prefetches to generate")
+    #     self.useFDP = Param.Int(options.l2-hwp-usefdp,
+    # "Flag to enable Feedback Directed Prefetching")
+
     # Do not consult stride prefetcher on instruction accesses
     on_inst = False
 
@@ -161,7 +183,17 @@ class StridePrefetcher(QueuedPrefetcher):
 
     use_master_id = Param.Bool(True, "Use master id based history")
 
-    degree = Param.Int(4, "Number of prefetches to generate")
+    degree = Param.Int(16, "Number of prefetches to generate")
+    # degree = Param.Int(options.l2-hwp-degree,
+    # "Number of prefetches to generate")
+    # start_degree = Param.Int(4, "Number of prefetches to generate")
+    epoch_cycles = Param.Cycles(100000, "Cycles in an epoch period")
+    A_high = Param.Float(0.75, "High Threshold for Accuracy")
+    A_low = Param.Float(0.40, "Low Threshold for Accuracy")
+    T_lateness = Param.Float(0.01, "Threshold for Lateness")
+    useFDP = Param.Int(True, "Flag to enable Feedback Directed Prefetching")
+    # useFDP = Param.Int(options.l2-hwp-usefdp,
+    # "Flag to enable Feedback Directed Prefetching")
 
     table_assoc = Param.Int(4, "Associativity of the PC table")
     table_entries = Param.MemorySize("64", "Number of entries of the PC table")
