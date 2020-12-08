@@ -98,7 +98,8 @@ class Stride : public Queued
 
     // const int startDegree;
     const int degree;
-    const Cycles epochCycles;
+    // const Cycles epochCycles;
+    const int intervalBlocks;
     const double A_high;
     const double A_low;
     const double T_lateness;
@@ -163,7 +164,8 @@ class Stride : public Queued
     Stats::Scalar CurrentDegree;
 
   public:
-    Cycles last_interval;
+    // Cycles last_interval;
+    int last_interval;
     // int degree;
     int current_degree;
     double int_usefulPrefetches;

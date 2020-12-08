@@ -80,7 +80,8 @@ Stride::Stride(const StridePrefetcherParams *p)
     useMasterId(p->use_master_id),
     // startDegree(p->start_degree),
     degree(p->degree),
-    epochCycles(p->epoch_cycles),
+    // epochCycles(p->epoch_cycles),
+    intervalBlocks(p->interval_blocks),
     A_high(p->A_high),
     A_low(p->A_low),
     T_lateness(p->T_lateness),
@@ -175,7 +176,8 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
         }
 
         if (fdp){
-            if ((curCycle() - last_interval)>epochCycles){
+            // if ((curCycle() - last_interval)>epochCycles){
+            if ((evictedBlocks - last_interval)>intervalBlocks){
                 cur_usefulPrefetches =  0.5*old_usefulPrefetches +
                                     0.5*(usedPrefetches-int_usefulPrefetches);
                 cur_issuedPrefetches =  0.5*old_issuedPrefetches +
@@ -189,12 +191,17 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
                 // double prefetch_accuracy =
                 //     usedPrefetches / issuedPrefetches;
                 // ignore indentation just to make commit possible
+    std::cout << "---------To monitor the changes----------" << std::endl;
+    std::cout << "prefetch_accuracy" << prefetch_accuracy << std::endl;
+    std::cout << "prefetch_lateness" << prefetch_lateness << std::endl;
+
     if (prefetch_accuracy>1){
     std::cout << "----------Found Accuracy > 1----------" << std::endl;
     std::cout << "prefetch_accuracy" << prefetch_accuracy << std::endl;
     std::cout << "prefetch_lateness" << prefetch_lateness << std::endl;
     std::cout << "Current Cycle" << curCycle() << std::endl;
-    std::cout << "epochCycles" << epochCycles << std::endl;
+    // std::cout << "epochCycles" << epochCycles << std::endl;
+    std::cout << "intervalBlocks" << intervalBlocks << std::endl;
     std::cout << "last_interval" << last_interval << std::endl;
     std::cout << "usedPrefetches" << usedPrefetches << std::endl;
     std::cout << "issuedPrefetches" << issuedPrefetches << std::endl;
@@ -203,10 +210,10 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
     std::cout << "old_latePrefetches" << old_latePrefetches << std::endl;
     std::cout << "cur_usefulPrefetches" << cur_usefulPrefetches << std::endl;
     std::cout << "cur_issuedPrefetches" << cur_issuedPrefetches << std::endl;
-    std::cout << "cur_issuedPrefetches" << cur_latePrefetches << std::endl;
+    std::cout << "cur_latePrefetches" << cur_latePrefetches << std::endl;
     std::cout << "int_usefulPrefetches" << int_usefulPrefetches << std::endl;
     std::cout << "int_issuedPrefetches" << int_issuedPrefetches << std::endl;
-    std::cout << "int_issuedPrefetches" << int_latePrefetches << std::endl;
+    std::cout << "int_latePrefetches" << int_latePrefetches << std::endl;
     std::cout << "Current Degree" << current_degree << std::endl;
     }
 
@@ -219,7 +226,8 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
                 current_degree = current_degree/2;
             }
 
-                last_interval = curCycle();
+                // last_interval = curCycle();
+                last_interval = evictedBlocks;
                 //Initializtion for the beginning of next interval
                 int_usefulPrefetches = usedPrefetches;
                 int_issuedPrefetches = issuedPrefetches;

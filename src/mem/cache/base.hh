@@ -1295,15 +1295,15 @@ class BaseCache : public ClockedObject
 
     int late_prefetches = 0;
 
-    /* Function to return the useful prefetches at any point of time */
+    /* Function to return the lats prefetches at any point of time */
     int get_late_pref(){
         return late_prefetches;
     }
 
-    int evictedBlocks;
-    /* Function to return the useful prefetches at any point of time */
+    int evicted_blocks;
+    /* Function to return the evicted blocks at any point of time */
     int get_evicted_blocks(){
-        return evictedBlocks;
+        return evicted_blocks;
     }
 };
 

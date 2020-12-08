@@ -187,7 +187,8 @@ class StridePrefetcher(QueuedPrefetcher):
     # degree = Param.Int(options.l2-hwp-degree,
     # "Number of prefetches to generate")
     # start_degree = Param.Int(4, "Number of prefetches to generate")
-    epoch_cycles = Param.Cycles(100000, "Cycles in an epoch period")
+    # epoch_cycles = Param.Cycles(100000, "Cycles in an epoch period")
+    interval_blocks = Param.Int(8192, "Cycles in an epoch period")
     A_high = Param.Float(0.75, "High Threshold for Accuracy")
     A_low = Param.Float(0.40, "Low Threshold for Accuracy")
     T_lateness = Param.Float(0.01, "Threshold for Lateness")
