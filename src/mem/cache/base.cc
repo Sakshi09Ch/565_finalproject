@@ -380,17 +380,18 @@ BaseCache::recvTimingReq(PacketPtr pkt)
             late_prefetches++;
             // std::cout << "Late Prefetches" << late_prefetches << std::endl;
         }
-        if(prefetcher){
-            demand_total++;        
-            std::cout << "Demand Total" << demand_total << std::endl;
+        if (prefetcher) {
+           demand_total++;
+           std::cout << "Demand Total" << demand_total << std::endl;
         }
 
-        // When a demand access misses in the cache, the filter is accessed 
-        //using the cache block address of the demand request        
-        //call bloom filter function to access the filter, use cache block 
+        // When a demand access misses in the cache, the filter is accessed
+        //using the cache block address of the demand request
+        //call bloom filter function to access the filter, use cache block
         //address as its inputs GET BIT
-        //if(pkt && pkt->getAddr() && base_bloom->getCount(pkt->getAddr())){
-        //pollution_total++; 
+        //if (pkt && pkt->getAddr()&&
+        //base_bloom->getCount(pkt->getAddr())){
+        //pollution_total++;
         //std::cout << "pollution_total" << pollution_total << std::endl;
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
 
@@ -489,9 +490,9 @@ BaseCache::recvTimingResp(PacketPtr pkt)
                 pkt->getAddr());
 
         const bool allocate = (writeAllocator && mshr->wasWholeLineWrite) ?
-            writeAllocator->allocate() : mshr->allocOnFill();  //bool allocate should be True
-        blk = handleFill(pkt, blk, writebacks, allocate); //victim block maybe in blk
-        assert(blk != nullptr); //assert that blk is actually a pointer to a cache entry!
+            writeAllocator->allocate() : mshr->allocOnFill();
+        blk = handleFill(pkt, blk, writebacks, allocate);
+        assert(blk != nullptr);
         ppFill->notify(pkt);
     }
 
@@ -1061,7 +1062,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
     // Access block in the tags
     Cycles tag_latency(0);
-    blk = tags->accessBlock(pkt->getAddr(), pkt->isSecure(), tag_latency);  //this calls findBlock and returns the blk
+    blk = tags->accessBlock(pkt->getAddr(), pkt->isSecure(), tag_latency);
 
     DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
             blk ? "hit " + blk->print() : "miss");
@@ -1345,7 +1346,7 @@ BaseCache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
 
         // need to do a replacement if allocating, otherwise we stick
         // with the temporary storage
-        blk = allocate ? allocateBlock_FDP(pkt, writebacks) : nullptr; //blk =allocateBlock as allocate=true
+        blk = allocate ? allocateBlock_FDP(pkt, writebacks) : nullptr;
 
         if (!blk) {
             // No replaceable block or a mostly exclusive
@@ -1514,12 +1515,13 @@ BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
     if (!victim)
         return nullptr;
 
-    //check here if victim blk was prefetched, if no then we need to use this block's address 
-    if(victim->wasPrefetched()){
+    //check here if victim blk was prefetched,
+    //if no then we need to use this block's address
+    if (victim->wasPrefetched()) {
         victimAddr= regenerateBlkAddr(victim);
-        if(pkt->cmd==MemCmd::HardPFResp){
-            //set filter entry for victimAddr
-            //use set() function from block_bloom_filter
+        if (pkt->cmd==MemCmd::HardPFResp) {
+          //set filter entry for victimAddr
+          //use set() function from block_bloom_filter
         }
     }
 
@@ -1545,7 +1547,7 @@ BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
     return victim;   //pointer to new inserted block at victim location
 }
 
-Addr 
+Addr
 BaseCache::getVictimAddr(Addr victimAddr)
 {
     return victimAddr;

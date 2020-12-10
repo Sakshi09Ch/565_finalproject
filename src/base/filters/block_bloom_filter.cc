@@ -61,10 +61,7 @@ Block::~Block()
 void
 Block::set(Addr addr)
 {
-    //filter[hash(addr)]++;
     filter[hash(addr)]++;
-    // if(filter[hash(addr)]>1)
-    //     filter[hash(addr)]--;
 }
 
 void

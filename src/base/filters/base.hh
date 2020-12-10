@@ -48,6 +48,7 @@ class Base : public SimObject
 
     /** The filter itself. */
     std::vector<SatCounter> filter;
+    //std::vector<unsigned> filter;
 
     /** Number of bits needed to represent the size of the filter. */
     const int sizeBits;
