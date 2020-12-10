@@ -45,7 +45,8 @@
  */
 
 #include "mem/cache/cache.hh"
-
+#include "base/filters/base.hh"
+#include "base/filters/block_bloom_filter.hh"
 #include <cassert>
 
 #include "base/compiler.hh"
@@ -65,6 +66,7 @@
 
 Cache::Cache(const CacheParams *p)
     : BaseCache(p, p->system->cacheLineSize()),
+      // block_bloom(p),
       doFastWrites(true)
 {
 }
@@ -847,10 +849,36 @@ Cache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
             cpuSidePort.schedTimingResp(tgt_pkt, completion_time);
             break;
 
-          case MSHR::Target::FromPrefetcher:
+          case MSHR::Target::FromPrefetcher: //pkt was from prefetcher
             assert(tgt_pkt->cmd == MemCmd::HardPFReq);
-            if (blk)
+            //prefAddrBloom=tgt_pkt->getAddr();
+            //use this pref_addr to access the bloom filter entry for this block and reset the bit
+            //base_bloom->unset(prefAddrBloom);
+            if (blk){
+                std::cout << " Trying to see if this block was not prefetched " << std::endl; 
+                //evictedAddrBloom=regenerateBlkAddr(blk);
+                prefAddrBloom=tgt_pkt->getAddr();
+                //use this address to access the bloom filter entry for this block and set the bit
+                std::cout << "Address value" << prefAddrBloom << std::endl;
+
+                // if(prefAddrBloom){
+                //     try
+                //     {
+                //         block_bloom->unset(prefAddrBloom);
+                //     }
+                //         catch (int e)
+                //     {
+                //         std::cout << "An exception occurred. Exception Nr. " << e << '\n';
+                //     }
+                    
+                // }
+
+                    
+                // else
+                //     std::cout << " evicted address is 0 " << std::endl; 
+                
                 blk->status |= BlkHWPrefetched;
+            }
             delete tgt_pkt;
             break;
 

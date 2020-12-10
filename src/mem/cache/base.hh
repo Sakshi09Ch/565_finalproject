@@ -75,6 +75,10 @@
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
+
+#include "base/filters/base.hh"
+#include "base/filters/block_bloom_filter.hh"
+
 namespace Prefetcher {
     class Base;
 }
@@ -357,6 +361,11 @@ class BaseCache : public ClockedObject
      * when we want to avoid allocation (e.g., exclusive caches)
      */
     TempCacheBlk *tempBlock;
+
+
+    BloomFilter::Block *block_bloom ;
+
+    BloomFilter::Base *base_bloom ;
 
     /**
      * Upstream caches need this packet until true is returned, so
@@ -751,6 +760,8 @@ class BaseCache : public ClockedObject
      * @return the allocated block
      */
     CacheBlk *allocateBlock(const PacketPtr pkt, PacketList &writebacks);
+
+    CacheBlk *allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks);
     /**
      * Evict a cache block.
      *
@@ -759,6 +770,10 @@ class BaseCache : public ClockedObject
      * @param blk Block to invalidate
      * @return A packet with the writeback, can be nullptr
      */
+    Addr victimAddr;
+    //Get address of victim block replaced (which was not prefetched)
+    Addr getVictimAddr(Addr victimAddr);
+
     M5_NODISCARD virtual PacketPtr evictBlock(CacheBlk *blk) = 0;
 
     /**
@@ -1294,6 +1309,10 @@ class BaseCache : public ClockedObject
     }
 
     int late_prefetches = 0;
+
+    int demand_total= 0;
+
+    int pollution_total=0;
 
     /* Function to return the useful prefetches at any point of time */
     int get_late_pref(){

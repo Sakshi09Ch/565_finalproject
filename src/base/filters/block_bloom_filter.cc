@@ -53,7 +53,7 @@ Block::Block(const BloomFilterBlockParams* p)
             "number of bits in an address");
     }
 }
-
+// Block::Block() //mustafa
 Block::~Block()
 {
 }
@@ -61,13 +61,19 @@ Block::~Block()
 void
 Block::set(Addr addr)
 {
+    //filter[hash(addr)]++;
     filter[hash(addr)]++;
+    // if(filter[hash(addr)]>1)
+    //     filter[hash(addr)]--;
 }
 
 void
 Block::unset(Addr addr)
 {
+    std::cout << "Hash address value" << std::endl;
     filter[hash(addr)]--;
+    //filter.at(hash(addr))--;
+    //filter[hash(addr)].reset();
 }
 
 int
@@ -88,6 +94,15 @@ Block::hash(Addr addr) const
     assert(hashed_addr < filter.size());
     return hashed_addr;
 }
+
+// int
+// Block::hash(Addr addr) const
+// {
+//     Addr hashed_addr = 0;
+//     hashed_addr= bits(addr, 23, 12) ^ bits(addr, 11, 0);
+//     assert(hashed_addr < filter.size());
+//     return hashed_addr;
+// }
 
 } // namespace BloomFilter
 

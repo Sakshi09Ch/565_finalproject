@@ -51,7 +51,7 @@ class Block : public Base
     void set(Addr addr) override;
     void unset(Addr addr) override;
     int getCount(Addr addr) const override;
-
+    int dummy=9;
   private:
     /**
      * XOR hash between bitfields of an address, provided by the mask vector.

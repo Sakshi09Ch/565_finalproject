@@ -380,7 +380,21 @@ BaseCache::recvTimingReq(PacketPtr pkt)
             late_prefetches++;
             // std::cout << "Late Prefetches" << late_prefetches << std::endl;
         }
+        if(prefetcher){
+            demand_total++;        
+            std::cout << "Demand Total" << demand_total << std::endl;
+        }
+
+        // When a demand access misses in the cache, the filter is accessed 
+        //using the cache block address of the demand request        
+        //call bloom filter function to access the filter, use cache block 
+        //address as its inputs GET BIT
+        //if(pkt && pkt->getAddr() && base_bloom->getCount(pkt->getAddr())){
+        //pollution_total++; 
+        //std::cout << "pollution_total" << pollution_total << std::endl;
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
+
+
 
         ppMiss->notify(pkt);
     }
@@ -475,9 +489,9 @@ BaseCache::recvTimingResp(PacketPtr pkt)
                 pkt->getAddr());
 
         const bool allocate = (writeAllocator && mshr->wasWholeLineWrite) ?
-            writeAllocator->allocate() : mshr->allocOnFill();
-        blk = handleFill(pkt, blk, writebacks, allocate);
-        assert(blk != nullptr);
+            writeAllocator->allocate() : mshr->allocOnFill();  //bool allocate should be True
+        blk = handleFill(pkt, blk, writebacks, allocate); //victim block maybe in blk
+        assert(blk != nullptr); //assert that blk is actually a pointer to a cache entry!
         ppFill->notify(pkt);
     }
 
@@ -1047,7 +1061,7 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
     // Access block in the tags
     Cycles tag_latency(0);
-    blk = tags->accessBlock(pkt->getAddr(), pkt->isSecure(), tag_latency);
+    blk = tags->accessBlock(pkt->getAddr(), pkt->isSecure(), tag_latency);  //this calls findBlock and returns the blk
 
     DPRINTF(Cache, "%s for %s %s\n", __func__, pkt->print(),
             blk ? "hit " + blk->print() : "miss");
@@ -1136,9 +1150,9 @@ BaseCache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
             return true;
         }
 
-        if (!blk) {
+        if (!blk) {                 //if block not found in cache
             // need to do a replacement
-            blk = allocateBlock(pkt, writebacks);
+            blk = allocateBlock(pkt, writebacks); //returns replacement victim
             if (!blk) {
                 // no replaceable block available: give up, fwd to next level.
                 incMissCount(pkt);
@@ -1331,7 +1345,7 @@ BaseCache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
 
         // need to do a replacement if allocating, otherwise we stick
         // with the temporary storage
-        blk = allocate ? allocateBlock(pkt, writebacks) : nullptr;
+        blk = allocate ? allocateBlock_FDP(pkt, writebacks) : nullptr; //blk =allocateBlock as allocate=true
 
         if (!blk) {
             // No replaceable block or a mostly exclusive
@@ -1442,6 +1456,7 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
     if (!victim)
         return nullptr;
 
+
     // Print victim block's information
     DPRINTF(CacheRepl, "Replacement victim: %s\n", victim->print());
 
@@ -1460,9 +1475,81 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
     // Insert new block at victimized entry
     tags->insertBlock(pkt, victim);
 
-    return victim;
+    return victim;   //pointer to new inserted block at victim location
 }
 
+
+CacheBlk*
+BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
+{
+    // Get address
+    const Addr addr = pkt->getAddr();
+
+    // Get secure bit
+    const bool is_secure = pkt->isSecure();
+
+    // Block size and compression related access latency. Only relevant if
+    // using a compressor, otherwise there is no extra delay, and the block
+    // is fully sized
+    std::size_t blk_size_bits = blkSize*8;
+    Cycles compression_lat = Cycles(0);
+    Cycles decompression_lat = Cycles(0);
+
+    // If a compressor is being used, it is called to compress data before
+    // insertion. Although in Gem5 the data is stored uncompressed, even if a
+    // compressor is used, the compression/decompression methods are called to
+    // calculate the amount of extra cycles needed to read or write compressed
+    // blocks.
+    if (compressor && pkt->hasData()) {
+        compressor->compress(pkt->getConstPtr<uint64_t>(), compression_lat,
+                             decompression_lat, blk_size_bits);
+    }
+
+    // Find replacement victim
+    std::vector<CacheBlk*> evict_blks;
+    CacheBlk *victim = tags->findVictim(addr, is_secure, blk_size_bits,
+                                        evict_blks);
+
+    // It is valid to return nullptr if there is no victim
+    if (!victim)
+        return nullptr;
+
+    //check here if victim blk was prefetched, if no then we need to use this block's address 
+    if(victim->wasPrefetched()){
+        victimAddr= regenerateBlkAddr(victim);
+        if(pkt->cmd==MemCmd::HardPFResp){
+            //set filter entry for victimAddr
+            //use set() function from block_bloom_filter
+        }
+    }
+
+
+    // Print victim block's information
+    DPRINTF(CacheRepl, "Replacement victim: %s\n", victim->print());
+
+    // Try to evict blocks; if it fails, give up on allocation
+    if (!handleEvictions(evict_blks, writebacks)) {
+        return nullptr;
+    }
+
+    // If using a compressor, set compression data. This must be done before
+    // block insertion, as compressed tags use this information.
+    if (compressor) {
+        compressor->setSizeBits(victim, blk_size_bits);
+        compressor->setDecompressionLatency(victim, decompression_lat);
+    }
+
+    // Insert new block at victimized entry
+    tags->insertBlock(pkt, victim);
+
+    return victim;   //pointer to new inserted block at victim location
+}
+
+Addr 
+BaseCache::getVictimAddr(Addr victimAddr)
+{
+    return victimAddr;
+}
 void
 BaseCache::invalidateBlock(CacheBlk *blk)
 {

@@ -52,11 +52,15 @@
 #include "base/types.hh"
 #include "mem/cache/base.hh"
 #include "mem/packet.hh"
+#include "base/filters/base.hh"
+#include "base/filters/block_bloom_filter.hh"
 
 class CacheBlk;
 struct CacheParams;
 class MSHR;
 
+// class Block;
+// class Base;
 /**
  * A coherent cache that can be arranged in flexible topologies.
  */
@@ -67,6 +71,13 @@ class Cache : public BaseCache
      * This cache should allocate a block on a line-sized write miss.
      */
     const bool doFastWrites;
+    Addr evictedAddrBloom=0;
+    Addr prefAddrBloom=0;
+
+    BloomFilter::Block *block_bloom; 
+
+    BloomFilter::Base *base_bloom ;
+
 
     /**
      * Store the outstanding requests that we are expecting snoop
