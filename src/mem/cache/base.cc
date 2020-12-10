@@ -1576,7 +1576,7 @@ BaseCache::evictBlock(CacheBlk *blk, PacketList &writebacks)
     if (pkt) {
         writebacks.push_back(pkt);
     }
-    evictedBlocks++;
+    evicted_blocks++;
 }
 
 PacketPtr

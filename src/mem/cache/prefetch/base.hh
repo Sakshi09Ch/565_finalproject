@@ -306,8 +306,6 @@ class Base : public ClockedObject
 
     bool hasBeenPrefetched(Addr addr, bool is_secure) const;
 
-    // int getUsedPrefetches();
-
     /** Determine if addresses are on the same page */
     bool samePage(Addr a, Addr b) const;
     /** Determine the address of the block in which a lays */
