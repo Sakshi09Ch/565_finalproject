@@ -209,6 +209,7 @@ def addCommonOptions(parser):
                       type of hardware prefetcher to use with the L2 cache.
                       (if not set, use the default prefetcher of
                       the selected cache)""")
+
     parser.add_option("--checker", action="store_true");
     parser.add_option("--cpu-clock", action="store", type="string",
                       default='2GHz',

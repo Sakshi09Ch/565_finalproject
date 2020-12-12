@@ -116,7 +116,6 @@ MSHR::TargetList::ifPrefetchTarget()
             count++;
         }
     }
-    // std::cout << "count for debugging" << count << std::endl;
     return count;
 }
 

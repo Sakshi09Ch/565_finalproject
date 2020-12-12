@@ -52,6 +52,7 @@
 #include "base/logging.hh"
 #include "base/random.hh"
 #include "base/trace.hh"
+#include "cpu/base.hh"
 #include "debug/HWPrefetch.hh"
 #include "mem/cache/prefetch/associative_set_impl.hh"
 #include "mem/cache/replacement_policies/base.hh"
@@ -85,6 +86,7 @@ Stride::Stride(const StridePrefetcherParams *p)
     A_high(p->A_high),
     A_low(p->A_low),
     T_lateness(p->T_lateness),
+    T_pollution(p->T_pollution),
     fdp(p->useFDP),
     pcTableInfo(p->table_assoc, p->table_entries, p->table_indexing_policy,
         p->table_replacement_policy),
@@ -92,8 +94,11 @@ Stride::Stride(const StridePrefetcherParams *p)
     // degree(startDegree)
     current_degree(degree),
     int_usefulPrefetches(0), int_issuedPrefetches(0), int_latePrefetches(0),
+    int_demandMisses(0), int_pollutionTotal(0),
     old_usefulPrefetches(0), old_issuedPrefetches(0), old_latePrefetches(0),
-    cur_usefulPrefetches(0), cur_issuedPrefetches(0), cur_latePrefetches(0)
+    old_demandMisses(0), old_pollutionTotal(0),
+    cur_usefulPrefetches(0), cur_issuedPrefetches(0), cur_latePrefetches(0),
+    cur_demandMisses(0), cur_pollutionTotal(0)
 {
 }
 
@@ -176,7 +181,6 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
         }
 
         if (fdp){
-            // if ((curCycle() - last_interval)>epochCycles){
             if ((evictedBlocks - last_interval)>intervalBlocks){
                 cur_usefulPrefetches =  0.5*old_usefulPrefetches +
                                     0.5*(usedPrefetches-int_usefulPrefetches);
@@ -184,63 +188,90 @@ Stride::calculatePrefetch(const PrefetchInfo &pfi,
                                 0.5*(issuedPrefetches-int_issuedPrefetches);
                 cur_latePrefetches = 0.5*old_latePrefetches +
                                     0.5*(latePrefetches-int_latePrefetches);
+                cur_demandMisses = 0.5*old_demandMisses +
+                                    0.5*(demandMisses-int_demandMisses);
+                cur_pollutionTotal = 0.5*old_pollutionTotal +
+                                    0.5*(pollutionTotal-int_pollutionTotal);
                 double prefetch_accuracy =
                     cur_usefulPrefetches / cur_issuedPrefetches;
                 double prefetch_lateness =
                     cur_latePrefetches / cur_usefulPrefetches;
-                // double prefetch_accuracy =
-                //     usedPrefetches / issuedPrefetches;
-                // ignore indentation just to make commit possible
-    std::cout << "---------To monitor the changes----------" << std::endl;
-    std::cout << "prefetch_accuracy" << prefetch_accuracy << std::endl;
-    std::cout << "prefetch_lateness" << prefetch_lateness << std::endl;
+                double cache_pollution =
+                    cur_pollutionTotal / cur_demandMisses;
 
-    if (prefetch_accuracy>1){
-    std::cout << "----------Found Accuracy > 1----------" << std::endl;
-    std::cout << "prefetch_accuracy" << prefetch_accuracy << std::endl;
-    std::cout << "prefetch_lateness" << prefetch_lateness << std::endl;
-    std::cout << "Current Cycle" << curCycle() << std::endl;
-    // std::cout << "epochCycles" << epochCycles << std::endl;
-    std::cout << "intervalBlocks" << intervalBlocks << std::endl;
-    std::cout << "last_interval" << last_interval << std::endl;
-    std::cout << "usedPrefetches" << usedPrefetches << std::endl;
-    std::cout << "issuedPrefetches" << issuedPrefetches << std::endl;
-    std::cout << "old_usefulPrefetches" << old_usefulPrefetches << std::endl;
-    std::cout << "old_issuedPrefetches" << old_issuedPrefetches << std::endl;
-    std::cout << "old_latePrefetches" << old_latePrefetches << std::endl;
-    std::cout << "cur_usefulPrefetches" << cur_usefulPrefetches << std::endl;
-    std::cout << "cur_issuedPrefetches" << cur_issuedPrefetches << std::endl;
-    std::cout << "cur_latePrefetches" << cur_latePrefetches << std::endl;
-    std::cout << "int_usefulPrefetches" << int_usefulPrefetches << std::endl;
-    std::cout << "int_issuedPrefetches" << int_issuedPrefetches << std::endl;
-    std::cout << "int_latePrefetches" << int_latePrefetches << std::endl;
-    std::cout << "Current Degree" << current_degree << std::endl;
-    }
-
-            if (prefetch_lateness>A_low && prefetch_lateness>T_lateness
-            && current_degree<64){
-                current_degree = current_degree*2;
+            // Logic to implement the conditions used in paper
+            // Can be simplified
+            if (prefetch_accuracy>A_high){
+                if (prefetch_lateness>T_lateness){
+                    if (current_degree<64){
+                        current_degree = current_degree*2;
+                    }
+                }
+                else{
+                    if (cache_pollution>T_pollution){
+                        if (current_degree>4){
+                            current_degree = current_degree/2;
+                        }
+                    }
+                }
             }
-            else if (prefetch_accuracy<A_low && prefetch_lateness>T_lateness
-            && current_degree>4){
-                current_degree = current_degree/2;
+            else if (prefetch_accuracy>A_low){
+                if (prefetch_lateness>T_lateness){
+                    if (cache_pollution>T_pollution){
+                        if (current_degree>4){
+                            current_degree = current_degree/2;
+                        }
+                    }
+                    else{
+                        if (current_degree<64){
+                            current_degree = current_degree*2;
+                        }
+                    }
+                }
+                else{
+                    if (cache_pollution>T_pollution){
+                        if (current_degree>4){
+                            current_degree = current_degree/2;
+                        }
+                    }
+                }
+            }
+            else{
+                if (prefetch_lateness>T_lateness){
+                    if (current_degree>4){
+                        current_degree = current_degree/2;
+                    }
+                }
+                else{
+                    if (cache_pollution>T_pollution){
+                        if (current_degree>4){
+                            current_degree = current_degree/2;
+                        }
+                    }
+                }
             }
 
-                // last_interval = curCycle();
                 last_interval = evictedBlocks;
                 //Initializtion for the beginning of next interval
                 int_usefulPrefetches = usedPrefetches;
                 int_issuedPrefetches = issuedPrefetches;
                 int_latePrefetches = latePrefetches;
+                int_demandMisses = demandMisses;
+                int_pollutionTotal = pollutionTotal;
                 // Update old counters
                 old_usefulPrefetches = cur_usefulPrefetches;
                 old_issuedPrefetches = cur_issuedPrefetches;
                 old_latePrefetches = cur_latePrefetches;
+                old_demandMisses = cur_demandMisses;
+                old_pollutionTotal = cur_pollutionTotal;
                 // For Dumping it to stats.txt
                 pfAccuracy = prefetch_accuracy;
                 testUsefulPrefetches = usedPrefetches;
                 testIssuedPrefetches = issuedPrefetches;
                 testLatePrefetches = latePrefetches;
+                testDemandMisses = demandMisses;
+                testPollutionTotal = pollutionTotal;
+                testEvictedBlocks = evictedBlocks;
                 CurrentDegree = current_degree;
             }
         }
@@ -292,6 +323,21 @@ Stride::regStats()
     testLatePrefetches
         .name(name() + ".test_late_prefetches")
         .desc("just to check the value of late prefetches")
+        ;
+
+    testDemandMisses
+        .name(name() + ".test_demand_misses")
+        .desc("just to check the value of demand misses")
+        ;
+
+    testPollutionTotal
+        .name(name() + ".test_pollution_total")
+        .desc("just to check the value of pollution total")
+        ;
+
+    testEvictedBlocks
+        .name(name() + ".test_evicted_blocks")
+        .desc("just to check the value of evicted blocks")
         ;
 
     CurrentDegree

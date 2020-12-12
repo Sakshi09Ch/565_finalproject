@@ -51,6 +51,8 @@
 #include <string>
 
 #include "base/addr_range.hh"
+#include "base/filters/base.hh"
+#include "base/filters/block_bloom_filter.hh"
 #include "base/statistics.hh"
 #include "base/trace.hh"
 #include "base/types.hh"
@@ -75,11 +77,10 @@
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
-
-#include "base/filters/base.hh"
-#include "base/filters/block_bloom_filter.hh"
-
 namespace Prefetcher {
+    class Base;
+}
+namespace BloomFilter{
     class Base;
 }
 class MSHR;
@@ -329,6 +330,9 @@ class BaseCache : public ClockedObject
     /** Prefetcher */
     Prefetcher::Base *prefetcher;
 
+    /** Bloom Filter */
+    BloomFilter::Base *bloomfilter;
+
     /** To probe when a cache hit occurs */
     ProbePointArg<PacketPtr> *ppHit;
 
@@ -363,9 +367,9 @@ class BaseCache : public ClockedObject
     TempCacheBlk *tempBlock;
 
 
-    BloomFilter::Block *block_bloom ;
+    // BloomFilter::Block *block_bloom ;
 
-    BloomFilter::Base *base_bloom ;
+    // BloomFilter::Base *base_bloom ;
 
     /**
      * Upstream caches need this packet until true is returned, so
@@ -747,6 +751,9 @@ class BaseCache : public ClockedObject
     CacheBlk *handleFill(PacketPtr pkt, CacheBlk *blk,
                          PacketList &writebacks, bool allocate);
 
+    CacheBlk *handleFill_FDP(PacketPtr pkt, CacheBlk *blk,
+                         PacketList &writebacks, bool allocate);
+
     /**
      * Allocate a new block and perform any necessary writebacks
      *
@@ -770,10 +777,6 @@ class BaseCache : public ClockedObject
      * @param blk Block to invalidate
      * @return A packet with the writeback, can be nullptr
      */
-    Addr victimAddr;
-    //Get address of victim block replaced (which was not prefetched)
-    Addr getVictimAddr(Addr victimAddr);
-
     M5_NODISCARD virtual PacketPtr evictBlock(CacheBlk *blk) = 0;
 
     /**
@@ -1224,7 +1227,6 @@ class BaseCache : public ClockedObject
     bool hasBeenPrefetched(Addr addr, bool is_secure) const {
         CacheBlk *block = tags->findBlock(addr, is_secure);
         if (block) {
-            std::cout << "Found a valid prefetch block" <<std::endl;
             return block->wasPrefetched();
         } else {
             return false;
@@ -1309,7 +1311,7 @@ class BaseCache : public ClockedObject
     }
 
     int late_prefetches = 0;
-    /* Function to return the lats prefetches at any point of time */
+    /* Function to return the late prefetches at any point of time */
     int get_late_pref(){
         return late_prefetches;
     }
@@ -1320,7 +1322,26 @@ class BaseCache : public ClockedObject
         return evicted_blocks;
     }
 
-    int demand_total=0;
+    int demand_misses = 0;
+
+    /* Function to return the useful prefetches at any point of time */
+    int get_demand_misses(){
+        return demand_misses;
+    }
+
+    int pollution_total = 0;
+
+    /* Function to return the useful prefetches at any point of time */
+    int get_pollution_total(){
+        return pollution_total;
+    }
+
+    struct victimVals {
+        bool victim_found = false;
+        Addr victimAddr;
+    };
+    victimVals victim_val;
+
 };
 
 /**

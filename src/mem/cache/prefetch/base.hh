@@ -331,6 +331,10 @@ class Base : public ClockedObject
     uint64_t latePrefetches;
     /** Number of blocks evicted from L2 Cache*/
     uint64_t evictedBlocks;
+    /** Number of blocks evicted from L2 Cache*/
+    uint64_t demandMisses;
+    /** Number of blocks evicted from L2 Cache*/
+    uint64_t pollutionTotal;
 
     /** Registered tlb for address translations */
     BaseTLB * tlb;

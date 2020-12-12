@@ -47,6 +47,7 @@
 
 #include "base/compiler.hh"
 #include "base/logging.hh"
+#include "cpu/base.hh"
 #include "debug/Cache.hh"
 #include "debug/CacheComp.hh"
 #include "debug/CachePort.hh"
@@ -82,6 +83,7 @@ BaseCache::BaseCache(const BaseCacheParams *p, unsigned blk_size)
       tags(p->tags),
       compressor(p->compressor),
       prefetcher(p->prefetcher),
+      bloomfilter(p->bloom_filter),
       writeAllocator(p->write_allocator),
       writebackClean(p->writeback_clean),
       tempBlockWriteback(nullptr),
@@ -366,11 +368,11 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         // the packet in a response
         ppHit->notify(pkt);
 
+        // Count the used prefetches
         if (prefetcher && blk && blk->wasPrefetched()) {
             blk->status &= ~BlkHWPrefetched;
             stats.usedPrefetches++;
             used_prefetches++;
-            // std::cout << "Used Prefetches" << used_prefetches << std::endl;
         }
 
         handleTimingReqHit(pkt, blk, request_time);
@@ -378,21 +380,23 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         MSHR *mshr=mshrQueue.findMatch(pkt->getAddr(),pkt->isSecure(),false);
         if (prefetcher && mshr && mshr->numPrefetchTargets()){
             late_prefetches++;
-            // std::cout << "Late Prefetches" << late_prefetches << std::endl;
-        }
-        if (prefetcher) {
-           demand_total++;
-           std::cout << "Demand Total" << demand_total << std::endl;
         }
 
-        // When a demand access misses in the cache, the filter is accessed
-        //using the cache block address of the demand request
-        //call bloom filter function to access the filter, use cache block
-        //address as its inputs GET BIT
-        //if (pkt && pkt->getAddr()&&
-        //base_bloom->getCount(pkt->getAddr())){
-        //pollution_total++;
-        //std::cout << "pollution_total" << pollution_total << std::endl;
+        if (prefetcher){
+            // only counting L2 Demand Misses prefetcher!=Null in L2
+            demand_misses++;
+
+            if (pkt && pkt->getAddr()){
+                //When a demand access misses in the cache, the filter is
+                //accessed using the cache block address of the demand request.
+                //Call bloom filter function to access the filter, use cache
+                //block address as its inputs GET value at that address
+                if (bloomfilter->getCount(pkt->getAddr())){
+                    pollution_total++;
+                }
+            }
+        }
+
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
 
 
@@ -491,7 +495,8 @@ BaseCache::recvTimingResp(PacketPtr pkt)
 
         const bool allocate = (writeAllocator && mshr->wasWholeLineWrite) ?
             writeAllocator->allocate() : mshr->allocOnFill();
-        blk = handleFill(pkt, blk, writebacks, allocate);
+        blk = handleFill_FDP(pkt, blk, writebacks, allocate);
+        // blk = handleFill(pkt, blk, writebacks, allocate);
         assert(blk != nullptr);
         ppFill->notify(pkt);
     }
@@ -516,6 +521,9 @@ BaseCache::recvTimingResp(PacketPtr pkt)
     }
 
     serviceMSHRTargets(mshr, pkt, blk);
+
+    // Need to reset it to prevent setting wrong places in Bloom filter
+    victim_val.victim_found = false;
 
     if (mshr->promoteDeferredTargets()) {
         // avoid later read getting stale data while write miss is
@@ -1346,7 +1354,107 @@ BaseCache::handleFill(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
 
         // need to do a replacement if allocating, otherwise we stick
         // with the temporary storage
+        blk = allocate ? allocateBlock(pkt, writebacks) : nullptr;
+
+        if (!blk) {
+            // No replaceable block or a mostly exclusive
+            // cache... just use temporary storage to complete the
+            // current request and then get rid of it
+            blk = tempBlock;
+            tempBlock->insert(addr, is_secure);
+            DPRINTF(Cache, "using temp block for %#llx (%s)\n", addr,
+                    is_secure ? "s" : "ns");
+        }
+    } else {
+        // existing block... probably an upgrade
+        // don't clear block status... if block is already dirty we
+        // don't want to lose that
+    }
+
+    // Block is guaranteed to be valid at this point
+    assert(blk->isValid());
+    assert(blk->isSecure() == is_secure);
+    assert(regenerateBlkAddr(blk) == addr);
+
+    blk->status |= BlkReadable;
+
+    // sanity check for whole-line writes, which should always be
+    // marked as writable as part of the fill, and then later marked
+    // dirty as part of satisfyRequest
+    if (pkt->cmd == MemCmd::InvalidateResp) {
+        assert(!pkt->hasSharers());
+    }
+
+    // here we deal with setting the appropriate state of the line,
+    // and we start by looking at the hasSharers flag, and ignore the
+    // cacheResponding flag (normally signalling dirty data) if the
+    // packet has sharers, thus the line is never allocated as Owned
+    // (dirty but not writable), and always ends up being either
+    // Shared, Exclusive or Modified, see Packet::setCacheResponding
+    // for more details
+    if (!pkt->hasSharers()) {
+        // we could get a writable line from memory (rather than a
+        // cache) even in a read-only cache, note that we set this bit
+        // even for a read-only cache, possibly revisit this decision
+        blk->status |= BlkWritable;
+
+        // check if we got this via cache-to-cache transfer (i.e., from a
+        // cache that had the block in Modified or Owned state)
+        if (pkt->cacheResponding()) {
+            // we got the block in Modified state, and invalidated the
+            // owners copy
+            blk->status |= BlkDirty;
+
+            chatty_assert(!isReadOnly, "Should never see dirty snoop response "
+                          "in read-only cache %s\n", name());
+
+        }
+    }
+
+    DPRINTF(Cache, "Block addr %#llx (%s) moving from state %x to %s\n",
+            addr, is_secure ? "s" : "ns", old_state, blk->print());
+
+    // if we got new data, copy it in (checking for a read response
+    // and a response that has data is the same in the end)
+    if (pkt->isRead()) {
+        // sanity checks
+        assert(pkt->hasData());
+        assert(pkt->getSize() == blkSize);
+
+        pkt->writeDataToBlock(blk->data, blkSize);
+    }
+    // The block will be ready when the payload arrives and the fill is done
+    blk->setWhenReady(clockEdge(fillLatency) + pkt->headerDelay +
+                      pkt->payloadDelay);
+
+    return blk;
+}
+
+// Made a duplicate function to not affect the other parts where old function
+// is used
+CacheBlk*
+BaseCache::handleFill_FDP(PacketPtr pkt, CacheBlk *blk, PacketList &writebacks,
+                      bool allocate)
+{
+    assert(pkt->isResponse());
+    Addr addr = pkt->getAddr();
+    bool is_secure = pkt->isSecure();
+#if TRACING_ON
+    CacheBlk::State old_state = blk ? blk->status : 0;
+#endif
+
+    // When handling a fill, we should have no writes to this line.
+    assert(addr == pkt->getBlockAddr(blkSize));
+    assert(!writeBuffer.findMatch(addr, is_secure));
+
+    if (!blk) {
+        // better have read new data...
+        assert(pkt->hasData() || pkt->cmd == MemCmd::InvalidateResp);
+
+        // need to do a replacement if allocating, otherwise we stick
+        // with the temporary storage
         blk = allocate ? allocateBlock_FDP(pkt, writebacks) : nullptr;
+        // blk = allocate ? allocateBlock(pkt, writebacks) : nullptr;
 
         if (!blk) {
             // No replaceable block or a mostly exclusive
@@ -1479,7 +1587,8 @@ BaseCache::allocateBlock(const PacketPtr pkt, PacketList &writebacks)
     return victim;   //pointer to new inserted block at victim location
 }
 
-
+// Made a duplicate function to not affect the other parts where old function
+// is used
 CacheBlk*
 BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
 {
@@ -1512,19 +1621,19 @@ BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
                                         evict_blks);
 
     // It is valid to return nullptr if there is no victim
-    if (!victim)
+    if (!victim){
+        victim_val.victim_found = false;
         return nullptr;
-
-    //check here if victim blk was prefetched,
-    //if no then we need to use this block's address
-    if (victim->wasPrefetched()) {
-        victimAddr= regenerateBlkAddr(victim);
-        if (pkt->cmd==MemCmd::HardPFResp) {
-          //set filter entry for victimAddr
-          //use set() function from block_bloom_filter
-        }
     }
 
+    // //check here if victim blk was prefetched,
+    // //if no then we need to use this block's address
+    // if (prefetcher){
+    //     if (victim && !victim->wasPrefetched()) {
+    //     victim_val.victim_found = true;
+    //     victim_val.victimAddr= regenerateBlkAddr(victim);
+    //     }
+    // }
 
     // Print victim block's information
     DPRINTF(CacheRepl, "Replacement victim: %s\n", victim->print());
@@ -1532,6 +1641,15 @@ BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
     // Try to evict blocks; if it fails, give up on allocation
     if (!handleEvictions(evict_blks, writebacks)) {
         return nullptr;
+    }
+
+    //check here if victim blk was prefetched,
+    //if no then we need to use this block's address
+    if (prefetcher){
+        if (victim && !victim->wasPrefetched()) {
+        victim_val.victim_found = true;
+        victim_val.victimAddr= regenerateBlkAddr(victim);
+        }
     }
 
     // If using a compressor, set compression data. This must be done before
@@ -1547,11 +1665,6 @@ BaseCache::allocateBlock_FDP(const PacketPtr pkt, PacketList &writebacks)
     return victim;   //pointer to new inserted block at victim location
 }
 
-Addr
-BaseCache::getVictimAddr(Addr victimAddr)
-{
-    return victimAddr;
-}
 void
 BaseCache::invalidateBlock(CacheBlk *blk)
 {

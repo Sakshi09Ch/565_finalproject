@@ -67,10 +67,7 @@ Block::set(Addr addr)
 void
 Block::unset(Addr addr)
 {
-    std::cout << "Hash address value" << std::endl;
     filter[hash(addr)]--;
-    //filter.at(hash(addr))--;
-    //filter[hash(addr)].reset();
 }
 
 int
@@ -79,27 +76,28 @@ Block::getCount(Addr addr) const
     return filter[hash(addr)];
 }
 
-int
-Block::hash(Addr addr) const
-{
-    Addr hashed_addr = 0;
-    for (int i = 0; i < masksLSBs.size(); i++) {
-        hashed_addr ^=
-            bits(addr, offsetBits + masksLSBs[i] + masksSizes[i] - 1,
-            offsetBits + masksLSBs[i]);
-    }
-    assert(hashed_addr < filter.size());
-    return hashed_addr;
-}
-
 // int
 // Block::hash(Addr addr) const
 // {
 //     Addr hashed_addr = 0;
-//     hashed_addr= bits(addr, 23, 12) ^ bits(addr, 11, 0);
+//     for (int i = 0; i < masksLSBs.size(); i++) {
+//         hashed_addr ^=
+//             bits(addr, offsetBits + masksLSBs[i] + masksSizes[i] - 1,
+//             offsetBits + masksLSBs[i]);
+//     }
 //     assert(hashed_addr < filter.size());
 //     return hashed_addr;
 // }
+
+// Adding own hashing function as used in the paper
+int
+Block::hash(Addr addr) const
+{
+    Addr hashed_addr = 0;
+    hashed_addr= bits(addr, 23, 12) ^ bits(addr, 11, 0);
+    assert(hashed_addr < filter.size());
+    return hashed_addr;
+}
 
 } // namespace BloomFilter
 

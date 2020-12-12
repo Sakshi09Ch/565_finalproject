@@ -103,6 +103,7 @@ class Stride : public Queued
     const double A_high;
     const double A_low;
     const double T_lateness;
+    const double T_pollution;
     const bool fdp;
 
     /**
@@ -161,6 +162,9 @@ class Stride : public Queued
     Stats::Scalar testUsefulPrefetches;
     Stats::Scalar testIssuedPrefetches;
     Stats::Scalar testLatePrefetches;
+    Stats::Scalar testDemandMisses;
+    Stats::Scalar testPollutionTotal;
+    Stats::Scalar testEvictedBlocks;
     Stats::Scalar CurrentDegree;
 
   public:
@@ -171,12 +175,18 @@ class Stride : public Queued
     double int_usefulPrefetches;
     double int_issuedPrefetches;
     double int_latePrefetches;
+    double int_demandMisses;
+    double int_pollutionTotal;
     double old_usefulPrefetches;
     double old_issuedPrefetches;
     double old_latePrefetches;
+    double old_demandMisses;
+    double old_pollutionTotal;
     double cur_usefulPrefetches;
     double cur_issuedPrefetches;
     double cur_latePrefetches;
+    double cur_demandMisses;
+    double cur_pollutionTotal;
 
     Stride(const StridePrefetcherParams *p);
 

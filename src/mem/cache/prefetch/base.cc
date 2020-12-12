@@ -96,7 +96,7 @@ Base::Base(const BasePrefetcherParams *p)
       prefetchOnAccess(p->prefetch_on_access),
       useVirtualAddresses(p->use_virtual_addresses), issuedPrefetches(0),
       usefulPrefetches(0), usedPrefetches(0), latePrefetches(0),
-      evictedBlocks(0), tlb(nullptr)
+      evictedBlocks(0), demandMisses(0), pollutionTotal(0), tlb(nullptr)
 {
 }
 
@@ -218,6 +218,8 @@ Base::probeNotify(const PacketPtr &pkt, bool miss)
     usedPrefetches = cache->get_used_pref();
     latePrefetches = cache->get_late_pref();
     evictedBlocks = cache->get_evicted_blocks();
+    demandMisses = cache->get_demand_misses();
+    pollutionTotal = cache->get_pollution_total();
 
     // Verify this access type is observed by prefetcher
     if (observeAccess(pkt, miss)) {
