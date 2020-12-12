@@ -42,7 +42,6 @@
 #include "arch/generic/tlb.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
-#include "cpu/base.hh"
 #include "debug/HWPrefetch.hh"
 #include "mem/cache/base.hh"
 #include "mem/request.hh"

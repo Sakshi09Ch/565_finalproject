@@ -366,11 +366,6 @@ class BaseCache : public ClockedObject
      */
     TempCacheBlk *tempBlock;
 
-
-    // BloomFilter::Block *block_bloom ;
-
-    // BloomFilter::Base *base_bloom ;
-
     /**
      * Upstream caches need this packet until true is returned, so
      * hold it for deletion until a subsequent call

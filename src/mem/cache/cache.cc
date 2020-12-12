@@ -66,7 +66,6 @@
 
 Cache::Cache(const CacheParams *p)
     : BaseCache(p, p->system->cacheLineSize()),
-      // block_bloom(p),
       doFastWrites(true)
 {
 }
@@ -849,7 +848,7 @@ Cache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
             cpuSidePort.schedTimingResp(tgt_pkt, completion_time);
             break;
 
-          case MSHR::Target::FromPrefetcher: //pkt was from prefetcher
+          case MSHR::Target::FromPrefetcher: //pkt has a target prefetcher
             assert(tgt_pkt->cmd == MemCmd::HardPFReq);
 
             if (blk){

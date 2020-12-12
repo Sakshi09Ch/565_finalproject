@@ -53,7 +53,7 @@ Block::Block(const BloomFilterBlockParams* p)
             "number of bits in an address");
     }
 }
-// Block::Block() //mustafa
+
 Block::~Block()
 {
 }

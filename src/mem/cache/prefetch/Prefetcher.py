@@ -43,10 +43,6 @@ from m5.proxy import *
 from m5.objects.ClockedObject import ClockedObject
 from m5.objects.IndexingPolicies import *
 from m5.objects.ReplacementPolicies import *
-# from optparse import OptionParser
-
-# parser = OptionParser()
-# (options, args) = parser.parse_args()
 
 class HWPProbeEvent(object):
     def __init__(self, prefetcher, obj, *listOfNames):
@@ -121,7 +117,6 @@ class QueuedPrefetcher(BasePrefetcher):
     abstract = True
     cxx_class = "Prefetcher::Queued"
     cxx_header = "mem/cache/prefetch/queued.hh"
-
     latency = Param.Int(1, "Latency for generated prefetches")
     queue_size = Param.Int(32, "Maximum number of queued prefetches")
     max_prefetch_requests_with_pending_translation = Param.Int(32,

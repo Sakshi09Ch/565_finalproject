@@ -47,7 +47,6 @@
 
 #include "base/compiler.hh"
 #include "base/logging.hh"
-#include "cpu/base.hh"
 #include "debug/Cache.hh"
 #include "debug/CacheComp.hh"
 #include "debug/CachePort.hh"
@@ -398,8 +397,6 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         }
 
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
-
-
 
         ppMiss->notify(pkt);
     }
